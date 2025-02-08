@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Dashboard</h1>
+    <button id="logoutButton">Logout</button>
+  </header>
+
+  <main>
+    <section id="balance">
+      <div class="balance-container">
+        <div class="balance-box">
+          <h3>Balance</h3>
+          <p id="balanceAmount">$0.00</p>
+        </div>
+        <div class="income-box">
+          <h3>Total Income</h3>
+          <p id="totalIncome">$0.00</p>
+        </div>
+        <div class="expense-box">
+          <h3>Total Expenses</h3>
+          <p id="totalExpenses">$0.00</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="transactions">
+      <h2>Transactions</h2>
+      <button id="addTransactionButton">Add Transaction</button>
+      <table id="transactionTable">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Category</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="transactionList">
+          <!-- Transactions will be populated here -->
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // Logout functionality
+    document.getElementById('logoutButton').addEventListener('click', function() {
+      fetch('/logout', { method: 'GET' })
+        .then(() => {
+          window.location.href = '/login'; // Redirect to login after logout
+        })
+        .catch(err => console.error('Error logging out:', err));
+    });
+
+    // Fetch and display transactions
+    function fetchTransactions() {
+      fetch('/transactions')
+        .then(response => response.json())
+        .then(data => {
+          const transactionList = document.getElementById('transactionList');
+          transactionList.innerHTML = '';
+
+          let balance = 0;
+          let totalIncome = 0;
+          let totalExpenses = 0;
+
+          data.forEach(transaction => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${transaction.type === 'income' ? 'Income' : 'Expense'}</td>
+              <td>$${transaction.amount}</td>
+              <td>${transaction.category}</td>
+              <td>
+                <button class="updateButton" data-id="${transaction.id}">Update</button>
+                <button class="deleteButton" data-id="${transaction.id}">Delete</button>
+              </td>
+            `;
+            transactionList.appendChild(row);
+
+            if (transaction.type === 'income') {
+              totalIncome += parseFloat(transaction.amount);
+            } else if (transaction.type === 'expense') {
+              totalExpenses += parseFloat(transaction.amount);
+            }
+          });
+
+          balance = totalIncome - totalExpenses;
+          document.getElementById('balanceAmount').textContent = `$${balance.toFixed(2)}`;
+          document.getElementById('totalIncome').textContent = `$${totalIncome.toFixed(2)}`;
+          document.getElementById('totalExpenses').textContent = `$${totalExpenses.toFixed(2)}`;
+        })
+        .catch(err => console.error('Error fetching transactions:', err));
+    }
+
+    // Add new transaction
+    document.getElementById('addTransactionButton').addEventListener('click', () => {
+      const amount = prompt('Enter the amount for the new transaction:');
+      const category = prompt('Enter the category for the new transaction:');
+      const type = prompt('Enter the type (income/expense):');
+      fetch('/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, category, type })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          fetchTransactions();
+        } else {
+          alert('Failed to add transaction');
+        }
+      })
+      .catch(err => console.error('Error adding transaction:', err));
+    });
+
+    // Update transaction
+    document.addEventListener('click', function(event) {
+      if (event.target.classList.contains('updateButton')) {
+        const transactionId = event.target.getAttribute('data-id');
+        const newAmount = prompt('Enter new amount for this transaction:');
+        const newCategory = prompt('Enter new category:');
+        fetch(`/transactions/${transactionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: newAmount, category: newCategory })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            fetchTransactions();
+          } else {
+            alert('Failed to update transaction');
+          }
+        })
+        .catch(err => console.error('Error updating transaction:', err));
+      }
+
+      // Delete transaction
+      if (event.target.classList.contains('deleteButton')) {
+        const transactionId = event.target.getAttribute('data-id');
+        if (confirm('Are you sure you want to delete this transaction?')) {
+          fetch(`/transactions/${transactionId}`, {
+            method: 'DELETE',
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              fetchTransactions();
+            } else {
+              alert('Failed to delete transaction');
+            }
+          })
+          .catch(err => console.error('Error deleting transaction:', err));
+        }
+      }
+    });
+
+    // Fetch transactions initially
+    fetchTransactions();
+  </script>
+</body>
+</html>
